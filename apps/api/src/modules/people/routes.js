@@ -44,7 +44,7 @@ peopleRouter.get('/:id/tree',
     params: idParams,
     query: depthQuery.extend({
       view: z.enum(['ancestors', 'descendants']).default('descendants'),
-      includeSpouses: bool.default('true'),
+      includeSpouses: bool.default(true),
     }),
   }),
   async (req, res) => {

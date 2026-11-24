@@ -29,7 +29,9 @@ export function AuthProvider({ children }) {
 
   const token = session?.access_token ?? (devUserId ? `dev:${devUserId}` : null);
   tokenRef.current = token;
-  useEffect(() => { setTokenProvider(() => tokenRef.current); }, []);
+  // Registered during the first render: child effects (data fetching) run
+  // before this component's effects, so an effect here would be too late.
+  useState(() => { setTokenProvider(() => tokenRef.current); });
 
   const meQuery = useQuery({
     queryKey: ['me', token],
@@ -57,7 +59,8 @@ export function AuthProvider({ children }) {
 
   const value = useMemo(() => {
     const user = meQuery.data?.user ?? null;
-    const verified = user?.membership_status === 'verified';
+    const mustChangePassword = Boolean(user?.must_change_password);
+    const verified = user?.membership_status === 'verified' && !mustChangePassword;
     return {
       ready: ready && (!token || !meQuery.isLoading),
       signedIn: Boolean(token) && !meQuery.isError,
@@ -65,6 +68,8 @@ export function AuthProvider({ children }) {
       person: meQuery.data?.person ?? null,
       needsProfile: Boolean(token) && meQuery.isSuccess && !user,
       verified,
+      mustChangePassword,
+      sessionEmail: session?.user?.email ?? null,
       isModerator: verified && ['moderator', 'admin'].includes(user?.role),
       isAdmin: verified && user?.role === 'admin',
       supabaseEnabled: Boolean(supabase),
@@ -72,7 +77,7 @@ export function AuthProvider({ children }) {
       signOut,
       refresh: () => meQuery.refetch(),
     };
-  }, [meQuery, ready, token, signInDev, signOut]);
+  }, [meQuery, ready, token, session, signInDev, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

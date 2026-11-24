@@ -54,8 +54,7 @@ test('audit log is append-only', async () => {
 test('row level security is enabled on every application table', async () => {
   const { rows } = await db.query(
     `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity
-       AND c.relname <> 'schema_migrations'`);
+     WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity`);
   assert.deepEqual(rows, [], `tables without RLS: ${rows.map((r) => r.relname).join(', ')}`);
 });
 

@@ -8,7 +8,7 @@
     "apps/web"
   ],
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "db:migrate": "npm run migrate -w database",
@@ -18,6 +18,15 @@
     "dev:api": "npm run dev -w apps/api",
     "dev:web": "npm run dev -w apps/web",
     "test:api": "npm test -w apps/api",
-    "build": "npm run build -w apps/web"
+    "build": "npm run build -w apps/web",
+    "dev": "npm run dev:api & npm run dev:web",
+    "test:web": "npm test -w apps/web",
+    "test": "npm run db:test && npm run test:api && npm run test:web",
+    "check:supabase": "node apps/api/scripts/check-supabase.js",
+    "make-admin": "node apps/api/scripts/make-admin.js",
+    "prod:make-admin": "node apps/api/scripts/make-admin.js --production",
+    "prod:migrate": "npm run migrate -w database -- --production",
+    "prod:status": "npm run status -w database -- --production",
+    "backup": "node database/scripts/backup.js"
   }
 }

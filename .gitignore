@@ -6,3 +6,11 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Real family data must never reach the repository
+/data/
+/backups/
+*.dump
+/*.csv
+/*.xlsx
+.vercel

@@ -5,7 +5,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Avatar } from '../../components/PersonCard.jsx';
 import { cx } from '../../components/ui.jsx';
-import { fuzzyYear, lifespan, ordinal, personName, pick } from '../../lib/format.js';
+import { fuzzyYear, lifespan, num, ordinal, personName, pick } from '../../lib/format.js';
 import { SIZES, UNION_COLORS } from './layout.js';
 
 const hidden = { opacity: 0, width: 1, height: 1, minWidth: 0, minHeight: 0, border: 0 };
@@ -23,18 +23,18 @@ function SpouseBadge({ info, person }) {
     role,
     info.unmarried ? t('person.noMarriageRecord') : null,
     m?.startDate ? `${t('person.married')} ${fuzzyYear(m.startDate, lang)}` : null,
-    m?.status && m.status !== 'ongoing' ? t(`person.marriageStatus.${m.status}`) : null,
+    m?.status && !['ongoing', 'unknown'].includes(m.status) ? t(`person.marriageShort.${m.status}`) : null,
   ].filter(Boolean);
   if (!parts.length) return null;
   return (
-    <div className="absolute -top-3 left-3 flex max-w-[180px] items-center gap-1 truncate rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] text-ink shadow-sm">
+    <div className="absolute -top-3 left-1/2 flex max-w-[196px] -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] text-ink shadow-sm">
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
       <span className="truncate">{parts.join(' · ')}</span>
     </div>
   );
 }
 
-export const PersonNode = memo(({ id, data }) => {
+export const PersonNode = memo(({ data }) => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const p = data.person ?? {};
@@ -84,19 +84,19 @@ export const PersonNode = memo(({ id, data }) => {
           type="button"
           onClick={() => data.onToggle?.(data.personId)}
           title={data.collapsed ? t('tree.expand') : t('tree.collapse')}
-          className="absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-paper px-1.5 text-[10px] text-forest-700 shadow-sm hover:bg-forest-50"
+          className={cx('absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-full border border-line bg-paper px-1.5 text-[10px] text-forest-700 shadow-sm hover:bg-forest-50', data.view === 'ancestors' ? '-top-3' : '-bottom-3')}
         >
           {data.view === 'ancestors'
             ? (data.collapsed ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
             : (data.collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />)}
-          {data.collapsed && data.hiddenCount > 0 && <span>{t('tree.hiddenChildren', { count: data.hiddenCount })}</span>}
+          {data.collapsed && data.hiddenCount > 0 && <span>{t('tree.hiddenChildren', { n: num(data.hiddenCount, lang) })}</span>}
         </button>
       )}
       {((data.view !== 'ancestors' && data.hasMoreChildren) || (data.view === 'ancestors' && data.hasMoreParents)) && !data.collapsed && (
         <button
           type="button"
           onClick={() => data.onLoadMore?.(data.personId)}
-          className={cx('absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-turmeric-500 px-2 py-0.5 text-[11px] font-medium text-forest-950 shadow hover:bg-turmeric-600',
+          className={cx('absolute left-1/2 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-turmeric-500 px-2 py-0.5 text-[11px] font-medium text-forest-950 shadow hover:bg-turmeric-600',
             data.view === 'ancestors' ? '-top-3' : '-bottom-3')}
         >
           <Plus className="h-3 w-3" /> {t('tree.loadMore')}
@@ -155,7 +155,7 @@ export function MarriageEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
 /** Parent → child link, coloured per marriage; adoption/foster dashed. */
 export function FamilyEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }) {
   const [path] = getSmoothStepPath({
-    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 10, centerY: data?.centerY,
+    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 10, centerY: data?.centerY, offset: 0,
   });
   const color = data?.colorIndex >= 0 ? UNION_COLORS[data.colorIndex] : '#9b9384';
   const dashed = data?.relationshipType && data.relationshipType !== 'biological';

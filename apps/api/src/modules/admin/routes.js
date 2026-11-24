@@ -34,7 +34,7 @@ adminRouter.get('/users',
       where.push(`(u.display_name_bn ILIKE $${params.length} OR u.display_name_en ILIKE $${params.length} OR u.email::text ILIKE $${params.length})`);
     }
     const { rows } = await query(
-      `SELECT u.id, u.email, u.phone, u.display_name_bn, u.display_name_en, u.role, u.membership_status,
+      `SELECT u.id, u.username, u.must_change_password, u.email, u.phone, u.display_name_bn, u.display_name_en, u.role, u.membership_status,
               u.verified_at, u.person_id, u.created_at
        FROM users u WHERE ${where.join(' AND ')}
        ORDER BY CASE u.role WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END, u.created_at DESC LIMIT 200`, params);

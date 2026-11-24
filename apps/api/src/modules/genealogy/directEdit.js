@@ -1,11 +1,12 @@
 // Moderator/admin direct edits of genealogy records (members use proposals).
 import { tx } from '../../db.js';
 import { badRequest } from '../../errors.js';
-import { createRecord, deleteRecord, parsePayload, updateRecord } from './writer.js';
+import { ENTITIES, createRecord, deleteRecord, parsePayload, updateRecord } from './writer.js';
 
 export async function directCreate(req, entity, payload) {
   const data = parsePayload(entity, 'create', payload, { isModerator: true });
-  if (Object.values(data).some((v) => typeof v === 'string' && v.startsWith('$'))) {
+  const isTempRef = ([name, v]) => ENTITIES[entity].fields[name].kind === 'ref' && typeof v === 'string' && v.startsWith('$');
+  if (Object.entries(data).some(isTempRef)) {
     throw badRequest('unknown_reference', 'Temporary references are only allowed inside proposals');
   }
   return tx(req, (db) => createRecord(db, entity, data, req.viewer.id));

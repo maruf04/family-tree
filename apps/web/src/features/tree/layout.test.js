@@ -117,6 +117,24 @@ test('ancestor view shows siblings and spouses on the root row without overlap',
   assertNoOverlap(nodes);
 });
 
+test('reference cards of repeated ancestors are connected, not floating', () => {
+  const { nodes, edges } = layoutAncestors(fixture('habib-ancestors'));
+  for (const ref of nodes.filter((n) => n.type === 'personRef')) {
+    assert.ok(edges.some((e) => e.source === ref.id || e.target === ref.id), `${ref.id} floats`);
+  }
+  const ids = new Set(nodes.map((n) => n.id));
+  for (const e of edges) assert.ok(ids.has(e.source) && ids.has(e.target), `dangling edge ${e.id}`);
+});
+
+test('ancestors loaded on demand do not bring in siblings or spouses', () => {
+  const base = fixture('habib-ancestors');
+  const person = (id, role) => ({ id, type: 'person', data: { role, person: {}, hasMoreParents: false } });
+  const merged = mergeGraphs(base, { nodes: [person(P.rahim, 'root'), person('gp', 'ancestor'), person('great-uncle', 'sibling')], edges: [{ id: 'x', type: 'parentChild', source: 'gp', target: P.rahim }, { id: 'y', type: 'parentChild', source: 'gp', target: 'great-uncle' }] });
+  assert.ok(merged.nodes.some((n) => n.id === 'gp'));
+  assert.ok(!merged.nodes.some((n) => n.id === 'great-uncle'));
+  assert.ok(!merged.edges.some((e) => e.id === 'y'));
+});
+
 test('merging a lazily loaded subtree adds nodes without duplicates', () => {
   const base = fixture('rahim-descendants');
   const extra = { ...base, nodes: base.nodes.slice(0, 3).map((n) => ({ ...n, data: { ...n.data, hasMoreChildren: false } })), edges: base.edges.slice(0, 2) };

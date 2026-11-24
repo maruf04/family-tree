@@ -81,7 +81,7 @@ export function lifespan(person, lang) {
 
 export function dateTime(value, lang, opts = { dateStyle: 'medium', timeStyle: 'short' }) {
   if (!value) return '';
-  return new Intl.DateTimeFormat(LOCALES[lang], opts).format(new Date(value));
+  return new Intl.DateTimeFormat(LOCALES[lang], { hourCycle: 'h23', ...opts }).format(new Date(value));
 }
 
 export function dateOnly(value, lang) {

@@ -7,7 +7,8 @@ const rootEnv = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const env = process.env;
-const isProduction = env.NODE_ENV === 'production';
+const isProduction = env.NODE_ENV === 'production' || Boolean(env.VERCEL);
+const hasLocalDatabase = /@(localhost|127\.0\.0\.1)[:/]/.test(env.DATABASE_URL ?? '');
 
 export const config = {
   isProduction,
@@ -18,11 +19,16 @@ export const config = {
     url: env.SUPABASE_URL || null,
     // Legacy HS256 projects use the JWT secret; newer projects publish a JWKS.
     jwtSecret: env.SUPABASE_JWT_SECRET || null,
+    publishableKey: env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || null,
     serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY || null,   // server only, never sent to clients
     storageBucket: env.SUPABASE_STORAGE_BUCKET || 'heritage-private',
   },
-  // Development login ("Bearer dev:<user-uuid>") — never available in production.
-  devAuth: !isProduction && env.DEV_AUTH !== 'false',
+  // Self-registration is off: admins and moderators create accounts.
+  allowRegistration: env.ALLOW_REGISTRATION === 'true',
+  databaseCaCert: env.DATABASE_CA_CERT || null,
+  // Development login ("Bearer dev:<user-uuid>") — only with a database on this
+  // computer, so a hosting misconfiguration can never open it.
+  devAuth: !isProduction && hasLocalDatabase && env.DEV_AUTH !== 'false',
 };
 
 if (!config.databaseUrl) {

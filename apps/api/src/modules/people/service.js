@@ -97,10 +97,10 @@ export async function getPersonProfile(viewer, id) {
   const row = await loadPersonRow(id);
   const person = presentPerson(row, viewer);
 
-  const [parentsRes, siblingsRes, familiesRes, sourcesRes, spouses] = await Promise.all([
+  const [parentsRes, siblingsRes, familiesRes, sourcesRes, spouses, marriedInRes] = await Promise.all([
     query(`SELECT pc.id AS relationship_id, pc.parent_id, pc.relationship_type, pc.certainty
            FROM parent_child pc JOIN people p ON p.id = pc.parent_id
-           WHERE pc.child_id = $1 ORDER BY p.sex DESC`, [id]),
+           WHERE pc.child_id = $1 ORDER BY p.sex`, [id]),
     query(`SELECT s.child_id AS sibling_id, count(*) AS shared_parents
            FROM parent_child mine
            JOIN parent_child s ON s.parent_id = mine.parent_id AND s.child_id <> mine.child_id
@@ -117,6 +117,12 @@ export async function getPersonProfile(viewer, id) {
            FROM source_links sl JOIN sources s ON s.id = sl.source_id
            WHERE sl.person_id = $1 ORDER BY sl.created_at`, [id]),
     getSpouses(viewer, id),
+    // Someone known only through marriage (a son's wife, a daughter's husband):
+    // not born or adopted into any recorded lineage, and no recorded parents.
+    query(`SELECT EXISTS (SELECT 1 FROM marriages WHERE $1 IN (spouse1_id, spouse2_id))
+              AND NOT EXISTS (SELECT 1 FROM parent_child WHERE child_id = $1)
+              AND NOT EXISTS (SELECT 1 FROM family_members WHERE person_id = $1 AND membership_type IN ('lineage', 'adoption'))
+              AS married_in`, [id]),
   ]);
 
   const people = await fetchPersonSummaries({ query }, [
@@ -126,12 +132,13 @@ export async function getPersonProfile(viewer, id) {
 
   return {
     person,
+    married_in: marriedInRes.rows[0].married_in,
     parents: parentsRes.rows.map((r) => ({
       relationship_id: r.relationship_id, relationship_type: r.relationship_type, certainty: r.certainty,
       person: presentPerson(people.get(r.parent_id), viewer),
     })),
     siblings: siblingsRes.rows.map((r) => ({
-      half: r.shared_parents < Math.min(2, parentsRes.rows.length) ,
+      half: r.shared_parents < Math.min(2, parentsRes.rows.length),
       person: presentPerson(people.get(r.sibling_id), viewer),
     })),
     spouses,

@@ -24,6 +24,13 @@ export function requireEnv(name) {
   return value;
 }
 
+/** The local database, or the live one when a script is run with --production. */
+export function databaseUrl() {
+  return requireEnv(process.argv.includes('--production') ? 'PRODUCTION_DATABASE_URL' : 'DATABASE_URL');
+}
+
+export const isLocalDatabase = (url) => ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname);
+
 /** Migration files look like 0001_description.sql and are applied in lexical order. */
 export function listMigrations() {
   return readdirSync(MIGRATIONS_DIR)
@@ -138,7 +145,9 @@ export async function loadSeeds(client, { log = console.log } = {}) {
 }
 
 export async function withClient(connectionString, fn) {
-  const client = new pg.Client({ connectionString });
+  const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n');
+  const ssl = isLocalDatabase(connectionString) ? false : ca ? { ca } : { rejectUnauthorized: false };
+  const client = new pg.Client({ connectionString, ssl });
   await client.connect();
   try {
     return await fn(client);

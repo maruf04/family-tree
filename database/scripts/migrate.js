@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 // Usage: npm run db:migrate            apply pending migrations
 //        npm run db:status             show applied / pending migrations
-import { loadEnv, migrate, migrationStatus, requireEnv, withClient } from './lib.js';
+import { databaseUrl, loadEnv, migrate, migrationStatus, withClient } from './lib.js';
 
 loadEnv();
-const url = requireEnv('DATABASE_URL');
 
 try {
-  await withClient(url, async (client) => {
+  await withClient(databaseUrl(), async (client) => {
     if (process.argv.includes('--status')) {
       for (const m of await migrationStatus(client)) {
         const when = m.appliedAt ? m.appliedAt.toISOString() : '';

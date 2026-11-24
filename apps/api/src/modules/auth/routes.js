@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { config } from '../../config.js';
 import { query, tx, withTransaction } from '../../db.js';
-import { conflict, notFound, unauthorized } from '../../errors.js';
+import { conflict, forbidden, notFound, unauthorized } from '../../errors.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { uuid, validate } from '../../middleware/validate.js';
 import { presentPerson } from '../genealogy/privacy.js';
@@ -16,7 +16,7 @@ authRouter.get('/me', async (req, res) => {
   if (!req.auth) throw unauthorized();
   if (!req.viewer) return res.json({ auth: req.auth, user: null });
   const { rows } = await query(
-    `SELECT id, email, phone, display_name_bn, display_name_en, role, membership_status, verified_at,
+    `SELECT id, username, must_change_password, email, phone, display_name_bn, display_name_en, role, membership_status, verified_at,
             preferred_language, person_id, created_at,
             (SELECT count(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS unread_notifications
      FROM users u WHERE id = $1`, [req.viewer.id]);
@@ -38,6 +38,7 @@ authRouter.post('/profile',
   validate({ body: profileBody.refine((b) => b.display_name_bn || b.display_name_en, { message: 'Name required', path: ['display_name_bn'] }) }),
   async (req, res) => {
     if (!req.auth) throw unauthorized();
+    if (!config.allowRegistration) throw forbidden('registration_closed', 'Accounts are created by the admins');
     if (req.viewer) throw conflict('profile_exists', 'Profile already exists');
     const b = req.valid.body;
     await withTransaction({ userId: req.auth.id, requestId: req.id }, (db) => db.query(
@@ -103,5 +104,5 @@ authRouter.get('/dev-users', async (_req, res) => {
 });
 
 authRouter.get('/config', (_req, res) => {
-  res.json({ devAuth: config.devAuth, supabase: Boolean(config.supabase.url) });
+  res.json({ devAuth: config.devAuth, supabase: Boolean(config.supabase.url), registration: config.allowRegistration });
 });

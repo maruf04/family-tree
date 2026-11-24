@@ -1,0 +1,33 @@
+# Runs every test and builds the site on each push. Uses fictional data only.
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: heritage
+          POSTGRES_PASSWORD: heritage
+          POSTGRES_DB: heritage_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://heritage:heritage@127.0.0.1:5432/heritage_test
+      DATABASE_URL: postgres://heritage:heritage@127.0.0.1:5432/heritage_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

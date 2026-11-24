@@ -71,6 +71,20 @@ test('member proposal (new child + two parent links) is applied atomically on ap
   await api().post(`/api/v1/proposals/${id}/approve`).set(as(U.moderator)).send({}).expect(409);
 });
 
+test('moderators apply several changes at once; a failure applies none of them', async () => {
+  const items = [
+    { entity_type: 'person', action: 'create', temp_ref: 'kid', payload: { full_name_en: 'Atomic Kid' } },
+    { entity_type: 'parent_child', action: 'create', payload: { parent_id: P.kamal, child_id: '$kid' } },
+  ];
+  await api().post('/api/v1/proposals/apply').set(as(U.member)).send({ items }).expect(403);
+  const bad = [...items, { entity_type: 'parent_child', action: 'create', payload: { parent_id: P.ayan, child_id: P.rahim } }];
+  await api().post('/api/v1/proposals/apply').set(as(U.moderator)).send({ items: bad }).expect(422);
+  const count = () => ctx.db.query(`SELECT count(*)::int AS n FROM people WHERE full_name_en = 'Atomic Kid'`).then((r) => r.rows[0].n);
+  assert.equal(await count(), 0);
+  await api().post('/api/v1/proposals/apply').set(as(U.moderator)).send({ items }).expect(201);
+  assert.equal(await count(), 1);
+});
+
 test('a failing item rolls back the whole proposal, which stays pending', async () => {
   const submit = await api().post('/api/v1/proposals').set(as(U.member)).send({
     summary: 'Bad: circular ancestry',

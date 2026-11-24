@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireRole, requireVerified } from '../../middleware/auth.js';
 import { idParams, uuid, validate } from '../../middleware/validate.js';
 import {
-  approveProposal, getProposal, listProposals, rejectProposal, submitProposal, withdrawProposal,
+  applyDirectly, approveProposal, getProposal, listProposals, rejectProposal, submitProposal, withdrawProposal,
 } from './service.js';
 
 export const proposalsRouter = Router();
@@ -14,7 +14,7 @@ const itemSchema = z.object({
   action: z.enum(['create', 'update', 'delete']),
   target_id: uuid.optional().nullable(),
   temp_ref: z.string().regex(/^[a-z][a-z0-9_]{0,40}$/).optional().nullable(),
-  payload: z.record(z.any()).default({}),
+  payload: z.record(z.string(), z.any()).default({}),
 });
 
 proposalsRouter.post('/',
@@ -30,6 +30,11 @@ proposalsRouter.post('/',
     const id = await submitProposal(req.viewer, req.id, req.valid.body);
     res.status(201).json({ id });
   });
+
+// Moderators/admins: apply a set of changes atomically, without review.
+proposalsRouter.post('/apply', requireRole('moderator'),
+  validate({ body: z.object({ items: z.array(itemSchema).min(1).max(30) }) }),
+  async (req, res) => res.status(201).json(await applyDirectly(req.viewer, req.id, req.valid.body.items)));
 
 proposalsRouter.get('/mine', async (req, res) => {
   res.json({ items: await listProposals({ proposerId: req.viewer.id }) });

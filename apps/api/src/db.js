@@ -5,7 +5,17 @@ import { config } from './config.js';
 pg.types.setTypeParser(20, (v) => Number.parseInt(v, 10));
 pg.types.setTypeParser(1700, (v) => Number.parseFloat(v));
 
-export const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
+// Remote databases are always encrypted. With DATABASE_CA_CERT (Supabase's
+// certificate) the server's identity is verified as well.
+const { hostname } = new URL(config.databaseUrl);
+const isLocal = ['localhost', '127.0.0.1', '::1', '[::1]', ''].includes(hostname);
+const ssl = isLocal ? false : config.databaseCaCert
+  ? { ca: config.databaseCaCert.replace(/\\n/g, '\n') }
+  : { rejectUnauthorized: false };
+
+// Serverless instances each keep their own small pool.
+export const pool = new pg.Pool({ connectionString: config.databaseUrl, max: process.env.VERCEL ? 3 : 10, ssl });
+pool.on('error', (err) => console.error('idle database connection lost:', err.message));
 
 export function query(text, params) {
   return pool.query(text, params);

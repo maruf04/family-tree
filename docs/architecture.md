@@ -9,13 +9,13 @@ a village's genealogy, history, directory, community and affairs.
 family-tree/
 ├── package.json            npm workspaces root
 ├── .env.example
-├── database/               ✅ milestone 1: PostgreSQL schema, migrations, seeds, DB tests
+├── database/               ✅ PostgreSQL schema, migrations, seeds, DB tests
 │   ├── migrations/         plain SQL, applied in order, one transaction per file
 │   ├── seeds/              FICTIONAL development data only
 │   ├── scripts/            migrate.js, seed.js, lib.js
 │   └── tests/              node:test suites against a throwaway *_test database
 ├── apps/
-│   ├── api/                ⏳ Express REST API (/api/v1)
+│   ├── api/                ✅ Express REST API (/api/v1)
 │   │   └── src/
 │   │       ├── config/         env parsing, Supabase admin client (server only)
 │   │       ├── db/             pg pool, transaction helper (sets app.user_id etc.)
@@ -29,7 +29,7 @@ family-tree/
 │   │       │   ├── proposals/
 │   │       │   ├── auth/ history/ directory/ community/ affairs/ admin/
 │   │       └── app.js, server.js
-│   └── web/                ⏳ React + Vite + Tailwind
+│   └── web/                ✅ React + Vite + Tailwind
 │       └── src/
 │           ├── i18n/           bn.json (default), en.json
 │           ├── api/            typed fetch client
@@ -92,15 +92,18 @@ genealogy is `user_has_role(user, 'moderator')`, which admins also pass.
 Unverified, rejected or suspended accounts have no member rights, whatever their role.
 The database also enforces admin-only role changes and that at least one verified admin always remains (migration 0005).
 
-## Milestones
+## Scope
 
-1. ✅ Architecture + PostgreSQL genealogy schema (this milestone)
-2. API skeleton: config, pg pool, transaction helper, error handling, people & families endpoints
-3. Relationships endpoints (parent-child, marriages) with validation
-4. Proposal + moderator approval workflow (transactional apply, temp refs, conflict detection)
-5. Ancestor/descendant traversal SQL functions + `/people/:id/tree` (React Flow nodes/edges)
-6. React app shell (bn/en, theme) + interactive family tree
-7. Multi-spouse layout tests (API + UI)
-8. Supabase Auth + membership verification
-9. Historical archive · 10. Village directory + map · 11. Community + village affairs
-12. Security hardening, backups, deployment
+One site for one bari (decision 2026-11-24). Several villages on one site was
+considered and dropped for now. Outsiders see only the name, totals and a list of
+features. There is no self-registration: moderators and admins create accounts with a
+username and a temporary password that must be changed at first sign-in.
+
+## Status
+
+Done: genealogy, proposals and review, trees, history, directory, community, village
+affairs, administration, managed accounts, spreadsheet import, backups, CI and Vercel
+setup (docs/LAUNCH.md), in Bangla and English.
+
+Not done: photo/file upload screens, edit/delete screens for history and places, merging
+duplicate people, attaching sources from the web app.

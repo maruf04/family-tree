@@ -21,6 +21,7 @@ export function RequireMember({ children }) {
   const auth = useAuth();
   if (!auth.ready) return <Spinner />;
   if (!auth.signedIn) return <Gate icon={Lock} title={t('auth.membersOnly')} text={t('auth.loginIntro')} to="/login" cta={t('nav.login')} />;
+  if (auth.needsProfile) return <Gate icon={Lock} title={t('account.notMember')} />;
   if (!auth.verified) return <Gate icon={ShieldCheck} title={t('auth.verifyTitle')} text={t('errors.verification_required')} to="/verify" cta={t('auth.verifyTitle')} />;
   return children;
 }

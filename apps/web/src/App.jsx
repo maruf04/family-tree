@@ -23,6 +23,7 @@ const ProposalDetail = lazy(() => import('./pages/ProposalDetail.jsx'));
 const Moderation = lazy(() => import('./pages/Moderation.jsx'));
 const Admin = lazy(() => import('./pages/Admin.jsx'));
 const Notifications = lazy(() => import('./pages/Notifications.jsx'));
+const Account = lazy(() => import('./pages/Account.jsx'));
 const Verify = lazy(() => import('./pages/Verify.jsx'));
 
 const member = (el) => <RequireMember>{el}</RequireMember>;
@@ -35,7 +36,7 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="login" element={<Login />} />
           <Route path="verify" element={<Verify />} />
-          <Route path="history" element={<History />} />
+          <Route path="history" element={member(<History />)} />
           <Route path="families" element={member(<Families />)} />
           <Route path="families/:id" element={member(<FamilyDetail />)} />
           <Route path="people/:id" element={member(<Person />)} />
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="proposals/:id" element={member(<ProposalDetail />)} />
           <Route path="moderation" element={<RequireModerator><Moderation /></RequireModerator>} />
           <Route path="admin" element={<RequireModerator><Admin /></RequireModerator>} />
+          <Route path="account" element={member(<Account />)} />
           <Route path="notifications" element={member(<Notifications />)} />
           <Route path="*" element={<NotFound />} />
         </Route>

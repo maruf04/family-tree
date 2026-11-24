@@ -12,25 +12,73 @@ import {
 
 const ACTIONS = ['create', 'update', 'delete'];
 
-export async function submitProposal(viewer, requestId, { familyId, summary, rationale, items }) {
+/** Validate items and their "$temp_ref" references (which must point at earlier items). */
+function prepareItems(items, { isModerator }) {
   const prepared = items.map((item, i) => {
     if (!ENTITIES[item.entity_type]) throw badRequest('invalid_entity', `Unknown entity ${item.entity_type}`);
     if (!ACTIONS.includes(item.action)) throw badRequest('invalid_action', `Unknown action ${item.action}`);
     if (item.action !== 'create' && !item.target_id) throw badRequest('validation_failed', `Item ${i + 1}: target_id required`);
     if (item.action === 'create' && item.target_id) throw badRequest('validation_failed', `Item ${i + 1}: create has no target_id`);
-    const payload = parsePayload(item.entity_type, item.action, item.payload, { isModerator: false });
+    const payload = parsePayload(item.entity_type, item.action, item.payload, { isModerator });
     return { ...item, payload, position: i + 1 };
   });
-  // References must point at temp_refs of earlier items.
   const known = new Set();
   for (const item of prepared) {
-    for (const v of Object.values(item.payload)) {
-      if (typeof v === 'string' && v.startsWith('$') && !known.has(v.slice(1))) {
-        throw badRequest('unknown_reference', `Unknown reference ${v}`);
+    for (const [name, value] of Object.entries(item.payload)) {
+      const isRef = ENTITIES[item.entity_type].fields[name].kind === 'ref';
+      if (isRef && typeof value === 'string' && value.startsWith('$') && !known.has(value.slice(1))) {
+        throw badRequest('unknown_reference', `Unknown reference ${value}`);
       }
     }
     if (item.temp_ref) known.add(item.temp_ref);
   }
+  return prepared;
+}
+
+/**
+ * Apply items in order inside the caller's transaction. With checkConflicts,
+ * a record that changed since its base_snapshot was taken is refused.
+ */
+async function applyItems(db, items, viewer, { checkConflicts = false, onApplied } = {}) {
+  const refs = {};
+  for (const item of items) {
+    const data = resolveRefs(item.entity_type, item.payload, refs);
+    let resultId;
+    if (item.action === 'create') {
+      resultId = await createRecord(db, item.entity_type, data, viewer.id);
+      if (item.temp_ref) refs[item.temp_ref] = resultId;
+    } else {
+      if (checkConflicts) {
+        const current = await snapshotRecord(db, item.entity_type, item.target_id);
+        const keys = item.action === 'delete'
+          ? Object.keys(item.base_snapshot ?? {}).filter((k) => k !== 'updated_at')
+          : Object.keys(data);
+        const changed = keys.filter((k) => normalizeValue(current[k]) !== normalizeValue(item.base_snapshot?.[k]));
+        if (changed.length) {
+          throw conflict('proposal_conflict', 'The record changed after this proposal was made', {
+            item: item.position, fields: changed,
+          });
+        }
+      }
+      resultId = item.action === 'update'
+        ? await updateRecord(db, item.entity_type, item.target_id, data, viewer.id)
+        : await deleteRecord(db, item.entity_type, item.target_id);
+    }
+    await onApplied?.(item, resultId);
+  }
+  return refs;
+}
+
+/** Moderators apply a set of changes directly; all succeed or none do. */
+export async function applyDirectly(viewer, requestId, items) {
+  const prepared = prepareItems(items, { isModerator: true });
+  return withTransaction({ userId: viewer.id, requestId }, async (db) => ({
+    created: await applyItems(db, prepared, viewer),
+  }));
+}
+
+export async function submitProposal(viewer, requestId, { familyId, summary, rationale, items }) {
+  const prepared = prepareItems(items, { isModerator: false });
 
   return withTransaction({ userId: viewer.id, requestId }, async (db) => {
     const { rows } = await db.query(
@@ -107,29 +155,10 @@ export async function approveProposal(viewer, requestId, id, note) {
     const { rows: items } = await db.query(
       `SELECT id, position, entity_type, action, target_id, temp_ref, payload, base_snapshot
        FROM change_proposal_items WHERE proposal_id = $1 ORDER BY position`, [id]);
-    const refs = {};
-    for (const item of items) {
-      const data = resolveRefs(item.entity_type, item.payload, refs);
-      let resultId;
-      if (item.action === 'create') {
-        resultId = await createRecord(db, item.entity_type, data, viewer.id);
-        if (item.temp_ref) refs[item.temp_ref] = resultId;
-      } else {
-        // Conflict detection: fields being changed must not have changed since the proposal was made.
-        const current = await snapshotRecord(db, item.entity_type, item.target_id);
-        const keys = item.action === 'delete' ? Object.keys(item.base_snapshot ?? {}).filter((k) => k !== 'updated_at') : Object.keys(data);
-        const changed = keys.filter((k) => normalizeValue(current[k]) !== normalizeValue(item.base_snapshot?.[k]));
-        if (changed.length) {
-          throw conflict('proposal_conflict', 'The record changed after this proposal was made', {
-            item: item.position, fields: changed,
-          });
-        }
-        resultId = item.action === 'update'
-          ? await updateRecord(db, item.entity_type, item.target_id, data, viewer.id)
-          : await deleteRecord(db, item.entity_type, item.target_id);
-      }
-      await db.query('UPDATE change_proposal_items SET result_id = $2 WHERE id = $1', [item.id, resultId]);
-    }
+    const refs = await applyItems(db, items, viewer, {
+      checkConflicts: true,
+      onApplied: (item, resultId) => db.query('UPDATE change_proposal_items SET result_id = $2 WHERE id = $1', [item.id, resultId]),
+    });
     await db.query(
       `UPDATE change_proposals SET status = 'approved', reviewed_by = $2, reviewed_at = now(),
               applied_at = now(), review_note = $3 WHERE id = $1`, [id, viewer.id, note ?? null]);

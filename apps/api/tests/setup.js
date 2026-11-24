@@ -8,6 +8,7 @@ export async function setupApp() {
   const db = await createTestDb();
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
   process.env.DEV_AUTH = 'true';
+  process.env.ALLOW_REGISTRATION = 'true';   // the self-registration path is still tested
   const { createApp } = await import('../src/app.js');
   const { pool } = await import('../src/db.js');
   const app = createApp({ rateLimits: false });

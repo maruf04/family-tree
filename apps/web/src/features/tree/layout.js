@@ -89,6 +89,8 @@ class Output {
       id,
       type: 'person',
       position: { x, y },
+      width: SIZES.CARD_W,
+      height: SIZES.CARD_H,
       draggable: false,
       data: { ...src?.data, personId, ...extra },
     });
@@ -100,7 +102,7 @@ class Output {
     const id = `${personId}::ref::${this.refCount}`;
     const src = this.idx.nodes.get(personId);
     this.nodes.push({
-      id, type: 'personRef', position: { x, y }, draggable: false,
+      id, type: 'personRef', position: { x, y }, width: SIZES.CARD_W, height: SIZES.CARD_H, draggable: false,
       data: { personId, person: src?.data?.person },
     });
     return id;
@@ -109,7 +111,7 @@ class Output {
   union(id, cx, cy, data) {
     const { DOT } = SIZES;
     this.nodes.push({
-      id, type: 'union', position: { x: cx - DOT / 2, y: cy - DOT / 2 }, draggable: false, selectable: false, data,
+      id, type: 'union', position: { x: cx - DOT / 2, y: cy - DOT / 2 }, width: DOT, height: DOT, draggable: false, selectable: false, data,
     });
     return id;
   }
@@ -315,16 +317,13 @@ function placeAncestorUnit(unit, x0, row, out, ctx) {
   const centerY = parentY + CARD_H + RAIL + 22;
   const couple = placed.length === 2 ? marriageBetween(ctx.idx, placed[0].id, placed[1].id) : null;
   if (couple) {
-    const unionId = `u:${placed[0].id}|${placed[1].id}`;
-    if (!ctx.unions.has(unionId)) {
-      ctx.unions.add(unionId);
-      const dotX = (placed[0].x + placed[1].x + CARD_W) / 2;
-      out.union(unionId, dotX, parentY + CARD_H + RAIL, { colorIndex: 0 });
-      out.edge({
-        id: `m:${unionId}`, source: placed[0].nodeId, target: placed[1].nodeId, sourceHandle: 'bottom', targetHandle: 'bottom-in',
-        type: 'marriage', data: { railY: parentY + CARD_H + RAIL, status: couple.data?.status, colorIndex: 0 },
-      });
-    }
+    const unionId = `u:${placed[0].nodeId}|${placed[1].nodeId}`;
+    const dotX = (placed[0].x + placed[1].x + CARD_W) / 2;
+    out.union(unionId, dotX, parentY + CARD_H + RAIL, { colorIndex: 0 });
+    out.edge({
+      id: `m:${unionId}`, source: placed[0].nodeId, target: placed[1].nodeId, sourceHandle: 'bottom', targetHandle: 'bottom-in',
+      type: 'marriage', data: { railY: parentY + CARD_H + RAIL, status: couple.data?.status, colorIndex: 0 },
+    });
     out.edge({
       id: `c:${unionId}:${unit.id}`, source: unionId, target: unit.id, sourceHandle: 'out', targetHandle: 'top', type: 'family',
       data: { centerY, colorIndex: 0, relationshipType: placed[0].edge?.data?.relationshipType ?? 'biological' },
@@ -346,7 +345,7 @@ export function layoutAncestors(graph, { collapsed = new Set() } = {}) {
   const out = new Output(idx);
   const rootId = graph.rootId;
   if (!idx.nodes.has(rootId)) return { nodes: [], edges: [] };
-  const ctx = { idx, placed: new Set(), collapsed, rootId, unions: new Set(), coupleUnion: new Map() };
+  const ctx = { idx, placed: new Set(), collapsed, rootId, coupleUnion: new Map() };
   const unit = buildAncestorUnit(rootId, idx, ctx);
   placeAncestorUnit(unit, 0, 0, out, ctx);
 
@@ -399,16 +398,24 @@ export function layoutTree(graph, opts) {
   return graph.view === 'ancestors' ? layoutAncestors(graph, opts) : layoutDescendants(graph, opts);
 }
 
-/** Merge a lazily loaded subtree into the current graph. */
+/**
+ * Merge a lazily loaded subtree into the current graph. Siblings and spouses
+ * of an ancestor loaded on demand are not part of the root's pedigree.
+ */
 export function mergeGraphs(base, extra) {
+  const ancestors = base.view === 'ancestors';
+  const inLine = (n) => !['spouse', 'coParent', 'sibling'].includes(n.data.role);
   const nodes = new Map(base.nodes.map((n) => [n.id, n]));
   for (const n of extra.nodes) {
     const existing = nodes.get(n.id);
-    nodes.set(n.id, existing
-      ? { ...existing, data: { ...existing.data, hasMoreChildren: n.data.hasMoreChildren, childCount: n.data.childCount } }
-      : n);
+    if (!existing) {
+      if (!ancestors || inLine(n)) nodes.set(n.id, n);
+    } else if (inLine(n)) {
+      const flag = ancestors ? 'hasMoreParents' : 'hasMoreChildren';
+      nodes.set(n.id, { ...existing, data: { ...existing.data, [flag]: n.data[flag] } });
+    }
   }
   const edges = new Map(base.edges.map((e) => [e.id, e]));
-  for (const e of extra.edges) edges.set(e.id, e);
+  for (const e of extra.edges) if (nodes.has(e.source) && nodes.has(e.target)) edges.set(e.id, e);
   return { ...base, nodes: [...nodes.values()], edges: [...edges.values()] };
 }

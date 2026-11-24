@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronDown, Languages, LogOut, Menu, ShieldCheck, Sparkles, UserRound, X } from 'lucide-react';
+import { Bell, ChevronDown, KeyRound, Languages, LogOut, Menu, ShieldCheck, Sparkles, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { ChangePassword } from '../features/account/ChangePassword.jsx';
 import { api } from '../lib/api.js';
 import { num, pick } from '../lib/format.js';
 import { Badge, cx } from './ui.jsx';
@@ -13,12 +14,17 @@ const NAV = [
   ['/directory', 'nav.directory'], ['/community', 'nav.community'], ['/affairs', 'nav.affairs'],
 ];
 
+function useHome() {
+  return useQuery({ queryKey: ['home-village'], queryFn: () => api.get('/home'), staleTime: 300_000 }).data;
+}
+
 function Logo() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const home = useHome();
   return (
     <Link to="/" className="flex items-center gap-2.5">
       <img src="/favicon.svg" alt="" className="h-9 w-9" />
-      <span className="font-display text-lg font-semibold leading-tight text-forest-900">{t('app.name')}</span>
+      <span className="line-clamp-2 max-w-[190px] font-display text-base font-semibold leading-tight text-forest-900 sm:text-lg">{pick(home?.village, 'name', i18n.language) || t('app.name')}</span>
     </Link>
   );
 }
@@ -79,7 +85,8 @@ function UserMenu() {
               {!auth.verified && <Badge tone="clay" className="ml-1">{t(`admin.membership.${auth.user?.membership_status ?? 'pending'}`)}</Badge>}
             </div>
             {auth.person && <Link to={`/people/${auth.person.id}`} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-forest-50"><UserRound className="h-4 w-4" />{t('nav.myProfile')}</Link>}
-            {!auth.verified && <Link to="/verify" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-forest-50"><ShieldCheck className="h-4 w-4" />{t('auth.verifyTitle')}</Link>}
+            {auth.verified && auth.supabaseEnabled && <Link to="/account" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-forest-50"><KeyRound className="h-4 w-4" />{t('account.changePassword')}</Link>}
+            {!auth.verified && !auth.mustChangePassword && <Link to="/verify" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-forest-50"><ShieldCheck className="h-4 w-4" />{t('auth.verifyTitle')}</Link>}
             {auth.verified && <Link to="/proposals" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-forest-50"><Sparkles className="h-4 w-4" />{t('nav.proposals')}</Link>}
             {auth.isModerator && (
               <Link to="/moderation" className="flex items-center justify-between px-4 py-2 text-sm hover:bg-forest-50">
@@ -96,15 +103,20 @@ function UserMenu() {
   );
 }
 
+const useHasSampleData = () => useHome()?.hasSampleData;
+
 function SampleBanner() {
   const { t } = useTranslation();
-  const home = useQuery({ queryKey: ['home-village'], queryFn: () => api.get('/home'), staleTime: 300_000 });
-  if (!/sample/i.test(home.data?.village?.name_en ?? '')) return null;
+  if (!useHasSampleData()) return null;
   return <div className="bg-turmeric-100 px-4 py-1.5 text-center text-xs text-turmeric-600">{t('common.fictional')}</div>;
 }
 
 export function Layout() {
   const { t } = useTranslation();
+  const hasSampleData = useHasSampleData();
+  const auth = useAuth();
+  // Outsiders only see the front page, so there is nothing else to navigate to.
+  const nav = auth.verified ? NAV : NAV.slice(0, 1);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   useEffect(() => { setMobileOpen(false); window.scrollTo(0, 0); }, [location.pathname]);
@@ -114,13 +126,13 @@ export function Layout() {
     isActive ? 'bg-forest-100 text-forest-900' : 'text-ink/80 hover:bg-forest-50 hover:text-forest-900');
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className={cx('flex flex-col', fullBleed ? 'h-dvh' : 'min-h-screen')}>
       <SampleBanner />
       <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
           <Logo />
           <nav className="hidden items-center gap-0.5 lg:flex" aria-label="primary">
-            {NAV.map(([to, key]) => <NavLink key={to} to={to} end={to === '/'} className={linkClass}>{t(key)}</NavLink>)}
+            {nav.map(([to, key]) => <NavLink key={to} to={to} end={to === '/'} className={linkClass}>{t(key)}</NavLink>)}
           </nav>
           <div className="flex items-center gap-2">
             <div className="hidden sm:block"><LanguageToggle /></div>
@@ -133,14 +145,14 @@ export function Layout() {
         {mobileOpen && (
           <nav className="border-t border-line bg-paper px-4 py-3 lg:hidden" aria-label="mobile">
             <div className="grid gap-1">
-              {NAV.map(([to, key]) => <NavLink key={to} to={to} end={to === '/'} className={linkClass}>{t(key)}</NavLink>)}
+              {nav.map(([to, key]) => <NavLink key={to} to={to} end={to === '/'} className={linkClass}>{t(key)}</NavLink>)}
             </div>
             <div className="mt-3"><LanguageToggle /></div>
           </nav>
         )}
       </header>
 
-      <main className={cx('flex-1', fullBleed && 'flex flex-col')}><Outlet /></main>
+      <main className={cx('flex-1', fullBleed && 'flex min-h-0 flex-col')}>{auth.mustChangePassword ? <div className="px-4 py-14"><ChangePassword forced /></div> : <Outlet />}</main>
 
       {!fullBleed && (
         <footer className="mt-16 border-t border-line bg-forest-900 text-forest-100 nakshi">
@@ -150,9 +162,9 @@ export function Layout() {
               <p className="mt-1 text-sm text-forest-300">{t('app.tagline')}</p>
             </div>
             <nav className="grid grid-cols-2 gap-1 text-sm">
-              {NAV.map(([to, key]) => <Link key={to} to={to} className="text-forest-100 hover:text-paper">{t(key)}</Link>)}
+              {nav.map(([to, key]) => <Link key={to} to={to} className="text-forest-100 hover:text-paper">{t(key)}</Link>)}
             </nav>
-            <p className="text-sm text-forest-300">{t('common.fictional')}</p>
+            {hasSampleData && <p className="text-sm text-forest-300">{t('common.fictional')}</p>}
           </div>
         </footer>
       )}

@@ -20,8 +20,9 @@ function Legend() {
   const { t } = useTranslation();
   const line = (style) => <svg width="28" height="8" aria-hidden><line x1="0" y1="4" x2="28" y2="4" strokeWidth="2.5" {...style} /></svg>;
   return (
-    <div className="space-y-1.5 rounded-xl border border-line bg-paper/95 p-3 text-xs shadow-sm">
+    <div className="flex flex-wrap gap-x-5 gap-y-1 border-b border-line bg-paper px-3 py-1.5 text-xs text-muted">
       <div className="flex items-center gap-2">{line({ stroke: '#1f4d3a' })}{t('tree.legend.marriage')}</div>
+      <div className="flex items-center gap-2">{line({ stroke: '#7d7466' })}{t('tree.legend.widowed')}</div>
       <div className="flex items-center gap-2">{line({ stroke: '#b5653a', strokeDasharray: '6 4' })}{t('tree.legend.ended')}</div>
       <div className="flex items-center gap-2">
         <span className="flex gap-0.5">{UNION_COLORS.slice(0, 3).map((c) => <span key={c} className="h-2.5 w-2.5 rounded-full" style={{ background: c }} />)}</span>
@@ -38,7 +39,7 @@ function SelectedPanel({ person, onClose }) {
   const lang = i18n.language;
   if (!person) return null;
   return (
-    <div className="absolute bottom-4 left-4 z-10 w-72 rounded-2xl border border-line bg-paper p-4 shadow-xl animate-rise">
+    <div className="absolute left-3 right-3 top-3 z-10 sm:left-auto sm:w-72 rounded-2xl border border-line bg-paper p-4 shadow-xl animate-rise">
       <button type="button" onClick={onClose} className="absolute right-2 top-2 rounded p-1 text-muted hover:bg-paper-200" aria-label={t('common.close')}><X className="h-4 w-4" /></button>
       <div className="flex items-center gap-3">
         <Avatar person={person} />
@@ -71,7 +72,7 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [showLegend, setShowLegend] = useState(true);
+  const [showLegend, setShowLegend] = useState(() => window.innerWidth >= 640);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const treeQuery = useQuery({
@@ -123,7 +124,8 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
       onFocus: (id) => focusNode(id),
     };
     return {
-      nodes: result.nodes.map((n) => ({ ...n, data: { ...n.data, ...handlers, highlight: n.id === highlight } })),
+      // React Flow disables pointer events on non-selectable nodes; the cards have buttons.
+      nodes: result.nodes.map((n) => ({ ...n, style: { pointerEvents: 'all' }, data: { ...n.data, ...handlers, highlight: n.id === highlight } })),
       edges: result.edges,
     };
   }, [graph, collapsed, view, highlight, onToggle, onLoadMore, navigate, focusNode]);
@@ -131,7 +133,15 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
   // Re-fit when the tree itself changes (not on highlight).
   useEffect(() => {
     if (!layout.nodes.length) return undefined;
-    const id = setTimeout(() => flow.fitView({ padding: 0.15, duration: 400, maxZoom: 1 }), 60);
+    const id = setTimeout(() => {
+      // On phones a fitted tree is unreadable: start at the root person instead.
+      const root = layout.nodes.find((n) => n.data.isRoot);
+      if (window.innerWidth < 640 && root) {
+        flow.setCenter(root.position.x + SIZES.CARD_W / 2, root.position.y + SIZES.CARD_H, { zoom: 0.8, duration: 400 });
+      } else {
+        flow.fitView({ padding: 0.15, duration: 400, maxZoom: 1 });
+      }
+    }, 60);
     return () => clearTimeout(id);
   }, [graph, view, collapsed, flow]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -150,7 +160,7 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-paper px-3 py-2">
-        <div className="inline-flex rounded-lg border border-line bg-white p-0.5" role="group" aria-label={t('tree.depth')}>
+        <div className="inline-flex rounded-lg border border-line bg-white p-0.5" role="group">
           {[['ancestors', ArrowUpWideNarrow], ['descendants', ArrowDownWideNarrow]].map(([v, Icon]) => (
             <button key={v} type="button" onClick={() => setView(v)} aria-pressed={view === v}
               className={cx('inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium', view === v ? 'bg-forest-700 text-paper' : 'text-forest-800 hover:bg-forest-50')}>
@@ -161,7 +171,7 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
         <label className="flex items-center gap-2 text-sm text-muted">
           {t('tree.depth')}
           <select value={depth} onChange={(e) => setDepth(Number(e.target.value))} className="rounded-lg border border-line bg-white px-2 py-1.5 text-ink">
-            {[2, 3, 4, 5, 6, 8, 10].map((d) => <option key={d} value={d}>{num(d, lang)}</option>)}
+            {[1, 2, 3, 4, 5, 6, 8, 10].map((d) => <option key={d} value={d}>{num(d, lang)}</option>)}
           </select>
         </label>
         <div className="relative min-w-[200px] flex-1">
@@ -186,8 +196,10 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
           )}
         </div>
         <Button variant="secondary" size="sm" onClick={() => flow.fitView({ padding: 0.15, duration: 400 })}><Maximize className="h-4 w-4" />{t('tree.fit')}</Button>
-        <Button variant="ghost" size="sm" onClick={() => setShowLegend((s) => !s)} aria-pressed={showLegend}><Info className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="sm" onClick={() => setShowLegend((s) => !s)} aria-pressed={showLegend} aria-label={t('tree.hint')} title={t('tree.hint')}><Info className="h-4 w-4" /></Button>
       </div>
+
+      {showLegend && <Legend />}
 
       <div className="relative min-h-0 flex-1 bg-[radial-gradient(circle_at_top,_#f7f1e4,_#efe6d4)]">
         <ReactFlow
@@ -207,11 +219,10 @@ function TreeCanvas({ personId, view, setView, depth, setDepth, rootName }) {
         >
           <Background color="#d9cdb4" gap={28} size={1.2} />
           <Controls showInteractive={false} position="bottom-right" />
-          <MiniMap pannable zoomable position="top-right" maskColor="rgba(250,246,238,0.7)"
+          <MiniMap pannable zoomable position="bottom-left" maskColor="rgba(250,246,238,0.7)"
             nodeColor={(n) => (n.type === 'union' ? 'transparent' : n.data?.isRoot ? '#c99a2e' : n.data?.person?.sex === 'female' ? '#e7b9a0' : '#a9cddb')}
             className="!hidden !rounded-xl !border !border-line sm:!block" />
         </ReactFlow>
-        {showLegend && <div className="absolute left-3 top-3 z-10 hidden sm:block"><Legend /></div>}
         <SelectedPanel person={selected ? people.get(selected) : null} onClose={() => setSelected(null)} />
         {loadingMore && <div className="absolute right-4 top-4 z-10 rounded-lg bg-paper px-3 py-1 text-sm shadow">{t('common.loading')}</div>}
         <p className="pointer-events-none absolute bottom-2 left-1/2 hidden -translate-x-1/2 text-xs text-muted md:block">{t('tree.hint')}</p>

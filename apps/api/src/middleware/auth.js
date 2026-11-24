@@ -25,7 +25,7 @@ async function verifySupabaseToken(token) {
 async function loadViewer(userId) {
   const { rows } = await query(
     `SELECT u.id, u.role, u.membership_status, u.person_id, u.display_name_bn, u.display_name_en,
-            u.preferred_language,
+            u.preferred_language, u.must_change_password,
             coalesce(array_agg(fm.family_id) FILTER (WHERE fm.family_id IS NOT NULL), '{}') AS family_ids
      FROM users u
      LEFT JOIN family_members fm ON fm.person_id = u.person_id
@@ -33,11 +33,13 @@ async function loadViewer(userId) {
      GROUP BY u.id`, [userId]);
   const u = rows[0];
   if (!u) return null;
-  const verified = u.membership_status === 'verified';
+  // A temporary password grants nothing until it has been changed.
+  const verified = u.membership_status === 'verified' && !u.must_change_password;
   return {
     id: u.id,
     role: u.role,
     membershipStatus: u.membership_status,
+    mustChangePassword: u.must_change_password,
     verified,
     personId: u.person_id,
     familyIds: u.family_ids,
@@ -83,6 +85,7 @@ export function requireAuth(req, _res, next) {
 export function requireVerified(req, res, next) {
   requireAuth(req, res, (err) => {
     if (err) return next(err);
+    if (req.viewer.mustChangePassword) return next(forbidden('password_change_required', 'Change your temporary password first'));
     if (!req.viewer.verified) return next(forbidden('verification_required', 'Village membership verification required'));
     next();
   });

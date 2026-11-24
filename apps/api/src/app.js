@@ -4,8 +4,10 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { config } from './config.js';
+import { query } from './db.js';
 import { errorHandler, notFound } from './errors.js';
 import { authenticate } from './middleware/auth.js';
+import { accountsRouter } from './modules/accounts/routes.js';
 import { adminRouter } from './modules/admin/routes.js';
 import { affairsRouter } from './modules/affairs/routes.js';
 import { authRouter } from './modules/auth/routes.js';
@@ -14,6 +16,7 @@ import { directoryRouter } from './modules/directory/routes.js';
 import { familiesRouter } from './modules/families/routes.js';
 import { historyRouter } from './modules/history/routes.js';
 import { homeRouter } from './modules/home/routes.js';
+import { importRouter } from './modules/import/routes.js';
 import { mediaRouter } from './modules/media/routes.js';
 import { notificationsRouter } from './modules/notifications/routes.js';
 import { peopleRouter } from './modules/people/routes.js';
@@ -27,6 +30,7 @@ export function createApp({ rateLimits = true } = {}) {
 
   app.use(helmet());
   app.use(cors({ origin: config.corsOrigins, credentials: false }));
+  app.use('/api/v1/import', express.json({ limit: '4mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use((req, res, next) => {
     req.id = req.get('x-request-id')?.slice(0, 64) || randomUUID();
@@ -43,7 +47,10 @@ export function createApp({ rateLimits = true } = {}) {
     }));
   }
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true }));
+  app.get('/api/health', async (_req, res) => {
+    await query('SELECT 1');
+    res.json({ ok: true });
+  });
 
   const v1 = express.Router();
   v1.use(authenticate);
@@ -57,6 +64,8 @@ export function createApp({ rateLimits = true } = {}) {
   v1.use('/directory', directoryRouter);
   v1.use('/community', communityRouter);
   v1.use('/affairs', affairsRouter);
+  v1.use('/accounts', accountsRouter);
+  v1.use('/import', importRouter);
   v1.use('/admin', adminRouter);
   v1.use('/media', mediaRouter);
   v1.use('/notifications', notificationsRouter);

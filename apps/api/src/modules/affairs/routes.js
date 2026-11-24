@@ -99,8 +99,8 @@ affairsRouter.post('/news/:id/review', requireRole('moderator'),
       if (!a) throw notFound('News article');
       if (a.status !== 'submitted') throw conflict('not_pending', `Article is ${a.status}`);
       await db.query(
-        `UPDATE news_articles SET status = $2, reviewed_by = $3, review_note = $4,
-                published_at = CASE WHEN $2 = 'published' THEN now() END, is_featured = coalesce($5, is_featured)
+        `UPDATE news_articles SET status = $2::news_status, reviewed_by = $3, review_note = $4,
+                published_at = CASE WHEN $2::news_status = 'published' THEN now() END, is_featured = coalesce($5, is_featured)
          WHERE id = $1`,
         [a.id, decision === 'publish' ? 'published' : 'rejected', req.viewer.id, note ?? null, featured ?? null]);
       await db.query(`INSERT INTO moderation_actions (moderator_id, action, news_article_id, note) VALUES ($1, $2, $3, $4)`,
