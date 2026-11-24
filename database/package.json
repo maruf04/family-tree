@@ -1,0 +1,16 @@
+{
+  "name": "@village-heritage/database",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PostgreSQL schema, migrations, seeds and database tests",
+  "type": "module",
+  "scripts": {
+    "migrate": "node scripts/migrate.js",
+    "status": "node scripts/migrate.js --status",
+    "seed": "node scripts/seed.js",
+    "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\""
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}

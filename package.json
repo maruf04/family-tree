@@ -1,0 +1,23 @@
+{
+  "name": "village-heritage",
+  "private": true,
+  "description": "Village Digital Heritage & Community Platform (Bangla/English)",
+  "workspaces": [
+    "database",
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "db:migrate": "npm run migrate -w database",
+    "db:status": "npm run status -w database",
+    "db:seed": "npm run seed -w database",
+    "db:test": "npm test -w database",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "test:api": "npm test -w apps/api",
+    "build": "npm run build -w apps/web"
+  }
+}

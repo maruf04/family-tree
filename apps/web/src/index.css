@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/* Visual identity: rural Bangladesh — paddy-green, warm paper, clay and turmeric. */
+@theme {
+  --font-sans: "Hind Siliguri", system-ui, sans-serif;
+  --font-serif: "Noto Serif Bengali", Georgia, serif;
+
+  --color-forest-950: #0d2418;
+  --color-forest-900: #12301f;
+  --color-forest-800: #173d2b;
+  --color-forest-700: #1f4d3a;
+  --color-forest-600: #2a6149;
+  --color-forest-500: #3d7a5d;
+  --color-forest-300: #8fbaa0;
+  --color-forest-100: #dcebe1;
+  --color-forest-50: #eef6f0;
+
+  --color-paper: #faf6ee;
+  --color-paper-200: #f3ecdf;
+  --color-paper-300: #e9dfcc;
+  --color-line: #e2d8c4;
+
+  --color-clay-700: #964f2a;
+  --color-clay-600: #b5653a;
+  --color-clay-100: #f6e3d6;
+  --color-turmeric-600: #b0841f;
+  --color-turmeric-500: #c99a2e;
+  --color-turmeric-100: #f7ecd0;
+  --color-river-600: #2f6f86;
+  --color-river-100: #dceef3;
+
+  --color-ink: #2b2a26;
+  --color-muted: #6b665c;
+
+  --animate-rise: rise 0.45s ease-out both;
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+html { background: var(--color-paper); color: var(--color-ink); }
+body { font-family: var(--font-sans); line-height: 1.65; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, .font-display { font-family: var(--font-serif); line-height: 1.35; }
+
+:focus-visible { outline: 2px solid var(--color-turmeric-500); outline-offset: 2px; }
+
+/* Nakshi-kantha inspired stitch pattern for hero and footer surfaces. */
+.nakshi {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%23c99a2e' stroke-opacity='.22' stroke-width='1.2' stroke-dasharray='3 3'%3E%3Cpath d='M24 4 44 24 24 44 4 24z'/%3E%3Cpath d='M24 14 34 24 24 34 14 24z'/%3E%3C/g%3E%3Ccircle cx='24' cy='24' r='2' fill='%23c99a2e' fill-opacity='.35'/%3E%3C/svg%3E");
+}
+.stitch-divider {
+  height: 6px;
+  background-image: repeating-linear-gradient(90deg, var(--color-clay-600) 0 10px, transparent 10px 18px);
+  opacity: .5;
+  border-radius: 3px;
+}
+
+/* React Flow overrides */
+.react-flow__attribution { background: transparent !important; font-size: 10px; }
+.react-flow__controls-button { background: var(--color-paper) !important; border-bottom-color: var(--color-line) !important; }
+.react-flow__controls-button svg { fill: var(--color-forest-700) !important; }
+.react-flow__handle { opacity: 0; pointer-events: none; }
+
+/* Leaflet sits under the sticky header */
+.leaflet-container { font-family: var(--font-sans); z-index: 0; }
+.leaflet-popup-content { font-family: var(--font-sans); margin: 10px 14px; }
