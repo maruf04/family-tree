@@ -127,6 +127,11 @@ test('rejected proposals change nothing and notify the proposer', async () => {
   assert.equal(kamal.rows[0].nickname_bn, null);
 });
 
+test('a person who still has relatives cannot be deleted, with a clear reason', async () => {
+  const res = await api().delete(`/api/v1/people/${P.karim}`).set(as(U.moderator)).expect(409);
+  assert.equal(res.body.error.code, 'in_use');
+});
+
 test('only admins change roles', async () => {
   const res = await api().patch(`/api/v1/admin/users/${U.member}`).set(as(U.moderator)).send({ role: 'moderator' }).expect(403);
   assert.equal(res.body.error.code, 'admin_only');

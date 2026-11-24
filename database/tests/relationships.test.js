@@ -148,6 +148,8 @@ test('a parent and child cannot be married, and spouses cannot become parent/chi
 
 test('relationships to people still referenced cannot be silently deleted', async () => {
   await inRollback(db, async () => {
-    await expectDbError(db, 'DELETE FROM people WHERE id = $1', [P.karim], { code: SQLSTATE.RESTRICT });
+    const error = await expectDbError(db, 'DELETE FROM people WHERE id = $1', [P.karim]);
+    // 23001 on PostgreSQL 18+, 23503 before that.
+    assert.ok([SQLSTATE.RESTRICT, SQLSTATE.FOREIGN_KEY].includes(error.code), error.message);
   });
 });

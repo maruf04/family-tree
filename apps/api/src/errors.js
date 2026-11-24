@@ -41,7 +41,9 @@ export function toAppError(err) {
   const mapped = err?.code && PG_ERRORS[err.code];
   if (mapped) {
     // Domain check failures inside fuzzy dates are reported as such.
-    const code = err.code === '23514' && /fuzzy_date/.test(err.message) ? 'invalid_date' : mapped[1];
+    // PostgreSQL 17 and older (Supabase) report ON DELETE RESTRICT as 23503, newer ones as 23001.
+    const inUse = err.code === '23503' && /^update or delete on table/.test(err.message);
+    const code = inUse ? 'in_use' : err.code === '23514' && /fuzzy_date/.test(err.message) ? 'invalid_date' : mapped[1];
     return new AppError(mapped[0], code, err.message, err.constraint ? { constraint: err.constraint } : undefined);
   }
   return null;
