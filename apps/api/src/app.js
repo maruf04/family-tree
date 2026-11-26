@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -23,12 +26,18 @@ import { peopleRouter } from './modules/people/routes.js';
 import { proposalsRouter } from './modules/proposals/routes.js';
 import { relationshipsRouter } from './modules/relationships/routes.js';
 
-export function createApp({ rateLimits = true } = {}) {
+// Built website (npm run build). Served by this server when hosting on a normal
+// Node host such as Render; on Vercel the website is served by Vercel itself.
+const WEB_DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+
+export function createApp({ rateLimits = true, serveWeb = false } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  // Security headers for the API only: helmet's strict default policy would block
+  // the website's own scripts, map tiles and Supabase calls.
+  app.use('/api', helmet());
   app.use(cors({ origin: config.corsOrigins, credentials: false }));
   app.use('/api/v1/import', express.json({ limit: '4mb' }));
   app.use(express.json({ limit: '1mb' }));
@@ -70,6 +79,28 @@ export function createApp({ rateLimits = true } = {}) {
   v1.use('/media', mediaRouter);
   v1.use('/notifications', notificationsRouter);
   app.use('/api/v1', v1);
+
+  if (serveWeb && existsSync(path.join(WEB_DIST, 'index.html'))) {
+    const webHeaders = (res) => {
+      res.set({
+        'X-Robots-Tag': 'noindex, nofollow',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+      });
+    };
+    // Hashed files under /assets never change: cache them for a year.
+    app.use('/assets', express.static(path.join(WEB_DIST, 'assets'), {
+      immutable: true, maxAge: '1y', setHeaders: webHeaders,
+    }));
+    app.use(express.static(path.join(WEB_DIST, '.'), { index: false, setHeaders: webHeaders }));
+    // Any other page address (no file extension) is a route of the single-page app;
+    // a missing file such as an old /assets/x.js gets a plain 404 instead.
+    app.get(/^\/(?!api\/)[^.]*$/, (_req, res) => {
+      webHeaders(res);
+      res.set('Cache-Control', 'no-cache').sendFile(path.join(WEB_DIST, 'index.html'));
+    });
+  }
 
   app.use((_req, _res, next) => next(notFound('Endpoint')));
   app.use(errorHandler);
