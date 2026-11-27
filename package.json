@@ -19,7 +19,6 @@
     "dev:web": "npm run dev -w apps/web",
     "test:api": "npm test -w apps/api",
     "build": "npm run build -w apps/web",
-    "start": "node apps/api/src/server.js",
     "dev": "npm run dev:api & npm run dev:web",
     "test:web": "npm test -w apps/web",
     "test": "npm run db:test && npm run test:api && npm run test:web",
